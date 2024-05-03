@@ -1,11 +1,11 @@
-/*  Monitorar as nossas instâncias em tempo real é um papel importante no 
+/*  Monitorar as nossas instÃ¢ncias em tempo real Ã© um papel importante no 
 	controle do nosso ambiente de trabalho e para manter a alta disponibilidade 
 	das bases de dados sempre ativas e funcionais. Quando trabalhamos com grande 
 	volume de dados e backups grandes, muitas vezes os backups levam tempo para 
-	serem realizados. No script que preparei abaixo, você consegue verificar qual 
-	backup está sendo realizado no SQL Server e quanto tempo estimado para o 
-	término desta execução. Ao executar este script, você terá acesso em tempo 
-	real a diversas informações relevantes de um backup em execução. 
+	serem realizados. No script que preparei abaixo, vocÃª consegue verificar qual 
+	backup estÃ¡ sendo realizado no SQL Server e quanto tempo estimado para o 
+	tÃ©rmino desta execuÃ§Ã£o. Ao executar este script, vocÃª terÃ¡ acesso em tempo 
+	real a diversas informaÃ§Ãµes relevantes de um backup em execuÃ§Ã£o. 
 */
 
 -- Script minificado (utilize o poor sql para organizar o script)
@@ -23,3 +23,4 @@
 				 FROM sys.dm_exec_sql_text(sql_handle)))
 FROM sys.dm_exec_requests r 
 WHERE command IN('BACKUP DATABASE','BACKUP LOG')
+--Creditos a @gabrielfinelli
