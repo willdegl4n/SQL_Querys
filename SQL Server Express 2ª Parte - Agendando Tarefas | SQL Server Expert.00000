@@ -1,0 +1,125 @@
+https://www.youtube.com/watch?v=naqgs5P9XCI
+SQL Server Express 2ª Parte - Agendando Tarefas | SQL Server Expert
+
+
+
+
+
+/********************************************************
+ Autor: Landry Duailibe
+
+ HandsOn: Agendamento de Backups no SQL Server Express
+********************************************************/
+
+/************************************************
+ HandsOn
+ - Cria dois bancos para testar rotina de Backup
+*************************************************/
+
+-- Testa se Bancos existem 
+DROP DATABASE IF exists VendasDB
+DROP DATABASE IF exists ContabilidadeDB
+go
+
+-- Cria Bancos
+CREATE DATABASE VendasDB
+CREATE DATABASE ContabilidadeDB
+go
+
+-- Altera o Recovery Model para SIMPLE
+ALTER DATABASE VendasDB SET RECOVERY simple
+ALTER DATABASE ContabilidadeDB SET RECOVERY simple
+go
+
+-- Consulta utilizada pela rotina de Backup
+SELECT [name],state_desc 
+--INTO dbo.tmpBancosBackupFULL 
+FROM sys.databases 
+WHERE source_database_id is null
+and state_desc = 'ONLINE' 
+and [name] not in ('tempdb') 
+ORDER BY [name]
+
+
+/***************************************
+ Rotina de Backup para agendamento
+****************************************/
+USE master
+go
+
+DECLARE @Caminho varchar(4000), @Banco varchar(500), @Compacta char(1),@Arquivo varchar(4000)
+DECLARE @state_desc varchar(200)
+SET @Caminho = 'C:\Backup' 
+SET @Compacta = 'S'
+
+IF object_id('dbo.tmpBancosBackupFULL') is not null
+   DROP TABLE dbo.tmpBancosBackupFULL
+
+SELECT [name],state_desc 
+INTO dbo.tmpBancosBackupFULL 
+FROM sys.databases 
+WHERE source_database_id is null
+and state_desc = 'ONLINE' 
+and [name] not in ('tempdb') 
+ORDER BY [name]
+
+DECLARE vCursor cursor FOR
+SELECT [name],state_desc FROM dbo.tmpBancosBackupFULL ORDER BY [name]
+
+OPEN vCursor
+FETCH NEXT FROM vCursor INTO @Banco, @state_desc
+WHILE @@FETCH_STATUS = 0
+BEGIN   
+
+   IF db_id(@Banco) is null BEGIN
+      PRINT '*** ERRO: DB_ID retornou NULL para o banco ' + @Banco 
+      FETCH NEXT FROM vCursor INTO @Banco, @state_desc
+      CONTINUE
+   END
+   
+   IF @state_desc <> 'ONLINE' BEGIN
+     PRINT '*** Banco: ' +  @Banco + ' está: ' + @state_desc
+     FETCH NEXT FROM vCursor INTO @Banco,@state_desc 
+     CONTINUE
+   END
+
+   PRINT 'Backup do Banco de Dados: ' + @Banco 
+   SET @Arquivo = '\' + @Banco + '_' + convert(char(8),getdate(),112)+ '_H' + replace(convert(char(8),getdate(),108),':','')
+
+   IF @Compacta = 'S'
+      EXEC('BACKUP DATABASE [' + @Banco + ']  TO DISK = ''' + @Caminho + @Arquivo + '.bak'' WITH FORMAT, COMPRESSION')
+   ELSE
+      EXEC('BACKUP DATABASE [' + @Banco + ']  TO DISK = ''' + @Caminho + @Arquivo + '.bak'' WITH FORMAT')
+
+   IF @@ERROR <> 0 BEGIN
+      PRINT '*** ERRO: backup do banco ' + @Banco + ' - Código de erro: ' + ltrim(str(@@error))
+      FETCH NEXT FROM vCursor INTO @Banco, @state_desc
+      CONTINUE
+   END   
+   FETCH NEXT FROM vCursor INTO @Banco, @state_desc
+END
+CLOSE vCursor
+DEALLOCATE vCursor
+
+if object_id('dbo.tmpBancosBackupFULL') is not null
+   DROP TABLE dbo.tmpBancosBackupFULL
+go
+
+/********************************************
+ Exclui Histórico dos Backups
+*********************************************/
+DECLARE @Caminho varchar(4000) = 'C:\Backup'
+DECLARE @DelDate datetime
+SET @DelDate = DATEADD(wk,-1,getdate())
+
+EXECUTE master.dbo.xp_delete_file 0,@Caminho,'bak',@DelDate,0
+go
+
+
+/**************************************************************************************
+ Criar arquivo _Script_Backup.sql com o Script acima
+ Criar arquivo _Backup.bat com comando abaixo
+
+ sqlcmd -S localhost -E -i C:\Backup\_Script_Backup.sql -o C:\Backup\_Log_Backup.txt
+***************************************************************************************/
+
